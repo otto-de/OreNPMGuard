@@ -2,7 +2,7 @@
 # Test Runner Script for OreNPMGuard
 # Runs both Python and Node.js test suites
 
-set -e
+set -euo pipefail
 
 echo "🧪 OreNPMGuard Test Suite"
 echo "=" | head -c 60 && echo ""
@@ -43,6 +43,7 @@ if command -v node &> /dev/null; then
     echo "🟢 Running Node.js Tests..."
     echo "----------------------------------------"
     cd "$(dirname "$0")/.."
+    npm install --silent > /dev/null 2>&1
     if node --test tests/test_nodejs_scanner.js 2>&1 | tee /tmp/nodejs_tests.log; then
         NODEJS_PASSED=1
         echo -e "${GREEN}✅ Node.js tests passed${NC}"

@@ -335,7 +335,7 @@ def scan_package_json(file_path: str) -> Tuple[List[Dict], List[Dict]]:
                 print(f"❌ Unsupported file format: {file_path}")
                 return [], []
             
-    except (FileNotFoundError, json.JSONDecodeError) as e:
+    except (FileNotFoundError, json.JSONDecodeError, yaml.YAMLError) as e:
         print(f"❌ Error reading {file_path}: {e}")
         return [], []
 
@@ -397,17 +397,17 @@ def scan_package_pnpm_lock_dependencies(package_data: dict, affected_db: Dict[st
        
     # Scan packages section if present
     if 'packages' in package_data:
-        packages: dict[str, dict] = package_data['packages']
-        for pkg_name, pkg_info in packages.items():
-            # Handle scoped packages
-            parts = pkg_name.split('@')
-            if (len(parts) > 2):
-                pkg_name = f"@{parts[1]}"
-            else:
-                pkg_name = parts[0]
-
-            installed_version = parts[-1]
-
+        packages: Dict[str, Dict] = package_data['packages']
+        for raw_key in packages.keys():
+            key = str(raw_key).lstrip('/')
+            key = key.split('(')[0]  # drop peer dependency suffix, if present
+            
+            at_index = key.rfind('@')
+            if at_index <= 0:
+                continue
+            pkg_name = key[:at_index]
+            installed_version = key[at_index + 1:]
+        
             if pkg_name in affected_db and installed_version:
                 if installed_version in affected_db[pkg_name]:
                     found_packages.append({

@@ -273,9 +273,7 @@ affected_packages:
 
     def test_compromised_package_detection_in_package_lock(self):
         """Test detection of compromised package versions."""
-        # Use a known compromised package from the database
-
-        self.setUpPackageListMock()
+                
         fixture_path = Path(__file__).parent / 'fixtures' / 'package_lock_shai_hulud_2.json'
         package_path = os.path.join(self.test_dir, "package-lock.json")
         print(f"Copying package-lock.json to {package_path}")
@@ -290,7 +288,6 @@ affected_packages:
         """Test detection of compromised package versions."""
         # Use a known compromised package from the database
 
-        self.setUpPackageListMock()
         fixture_path = Path(__file__).parent / 'fixtures' / 'pnpm_lock_shai_hulud_2.yaml'
         package_path = os.path.join(self.test_dir, "pnpm-lock.yaml")
         print(f"Copying pnpm-lock.yaml to {package_path}")
