@@ -327,8 +327,15 @@ def scan_package_json(file_path: str) -> Tuple[List[Dict], List[Dict]]:
     """Scan a package.json or package-lock.json file for affected packages."""
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
-            package_data = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError) as e:
+            if (file_path.endswith('.json')):
+                package_data = json.load(f)
+            elif file_path.endswith('.yaml'):
+                package_data = yaml.safe_load(f)
+            else:
+                print(f"❌ Unsupported file format: {file_path}")
+                return [], []
+            
+    except (FileNotFoundError, json.JSONDecodeError, yaml.YAMLError) as e:
         print(f"❌ Error reading {file_path}: {e}")
         return [], []
 
@@ -336,7 +343,9 @@ def scan_package_json(file_path: str) -> Tuple[List[Dict], List[Dict]]:
 
     # Determine file type and scan accordingly
     if file_path.endswith('package-lock.json'):
-        return scan_package_lock_dependencies(package_data, affected_db)
+        return scan_package_npm_lock_dependencies(package_data, affected_db)
+    elif file_path.endswith('pnpm-lock.yaml'):
+        return scan_package_pnpm_lock_dependencies(package_data, affected_db)
     else:
         return scan_package_json_dependencies(package_data, affected_db)
 
@@ -380,8 +389,46 @@ def scan_package_json_dependencies(package_data: dict, affected_db: Dict[str, Se
 
     return found_packages, potential_matches
 
+def scan_package_pnpm_lock_dependencies(package_data: dict, affected_db: Dict[str, Set[str]]) -> Tuple[
+    List[Dict], List[Dict]]:
+    """Scan pnpm-lock.yaml dependencies."""
+    found_packages = []
+    potential_matches = []
+       
+    # Scan packages section if present
+    if 'packages' in package_data:
+        packages: Dict[str, Dict] = package_data['packages']
+        for raw_key in packages.keys():
+            key = str(raw_key).lstrip('/')
+            key = key.split('(')[0]  # drop peer dependency suffix, if present
+            
+            at_index = key.rfind('@')
+            if at_index <= 0:
+                continue
+            pkg_name = key[:at_index]
+            installed_version = key[at_index + 1:]
+        
+            if pkg_name in affected_db and installed_version:
+                if installed_version in affected_db[pkg_name]:
+                    found_packages.append({
+                        'name': pkg_name,
+                        'installed_version': installed_version,
+                        'affected_versions': list(affected_db[pkg_name]),
+                        'section': 'packages',
+                        'exact_match': True
+                    })
+                else:
+                    potential_matches.append({
+                        'name': pkg_name,
+                        'installed_version': installed_version,
+                        'affected_versions': list(affected_db[pkg_name]),
+                        'section': 'packages',
+                        'exact_match': False
+                    })
 
-def scan_package_lock_dependencies(package_data: dict, affected_db: Dict[str, Set[str]]) -> Tuple[
+    return found_packages, potential_matches
+
+def scan_package_npm_lock_dependencies(package_data: dict, affected_db: Dict[str, Set[str]]) -> Tuple[
     List[Dict], List[Dict]]:
     """Scan package-lock.json dependencies (includes nested dependencies)."""
     found_packages = []
@@ -511,6 +558,8 @@ def scan_directory(directory: str) -> None:
             files_to_scan.append(('package.json', '📦'))
         if 'package-lock.json' in files:
             files_to_scan.append(('package-lock.json', '🔒'))
+        if 'pnpm-lock.yaml' in files:
+            files_to_scan.append(('pnpm-lock.yaml', '🔒'))
 
         for filename, icon in files_to_scan:
             file_path = os.path.join(root, filename)
@@ -562,7 +611,9 @@ def main():
     target_path = sys.argv[1]
 
     if os.path.isfile(target_path) and (
-            target_path.endswith('package.json') or target_path.endswith('package-lock.json')):
+            target_path.endswith('package.json') 
+            or target_path.endswith('package-lock.json') 
+            or target_path.endswith('pnpm-lock.yaml')):
         print(f"🔍 Scanning file: {target_path}")
         print("=" * 60)
 
